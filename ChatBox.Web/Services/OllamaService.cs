@@ -9,15 +9,20 @@ public class OllamaService : IOllamaService
     private readonly HttpClient _httpClient;
     private readonly ILogger<OllamaService> _logger;
     private readonly string _defaultModel;
+    private readonly int _timeoutSeconds;
+    private readonly int _tagsTimeoutSeconds;
 
     public OllamaService(HttpClient httpClient, IConfiguration configuration, ILogger<OllamaService> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
         _defaultModel = configuration.GetValue<string>("Ollama:DefaultModel") ?? "qwen3.8";
+        _timeoutSeconds = configuration.GetValue<int?>("Ollama:TimeoutSeconds") ?? 1800;
+        _tagsTimeoutSeconds = configuration.GetValue<int?>("Ollama:TagsTimeoutSeconds") ?? 10;
 
         var baseUrl = configuration.GetValue<string>("Ollama:BaseUrl") ?? "http://localhost:11434";
         _httpClient.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+        _httpClient.Timeout = TimeSpan.FromSeconds(_timeoutSeconds);
     }
 
     /// <summary>
@@ -31,7 +36,7 @@ public class OllamaService : IOllamaService
         try
         {
             // Use a short timeout for checking tags so UI loads instantly without hanging
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_tagsTimeoutSeconds));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
             var response = await _httpClient.GetAsync("api/tags", linkedCts.Token);
@@ -147,7 +152,7 @@ public class OllamaService : IOllamaService
             return new OllamaChatResponse
             {
                 Done = true,
-                Error = "زمان انتظار برای پاسخ مدل Ollama به پایان رسید (Timeout)."
+                Error = $"زمان انتظار برای پاسخ مدل Ollama به پایان رسید (Timeout بعد از {_timeoutSeconds} ثانیه). در صورت نیاز می‌توانید مقدار 'TimeoutSeconds' را در appsettings.json افزایش دهید."
             };
         }
         catch (Exception ex)
