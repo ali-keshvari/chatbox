@@ -1,0 +1,228 @@
+@{
+    ViewData["Title"] = "چت‌باکس هوشمند اسناد با اولاما";
+}
+
+<div class="chat-app-wrapper">
+    <!-- Sidebar -->
+    <aside class="chat-sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="bi bi-robot"></i>
+                </div>
+                <div class="brand-info">
+                    <h5 class="m-0 fw-bold">ChatBox AI</h5>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">ASP.NET 10</span>
+                </div>
+            </div>
+            <button class="btn btn-icon d-lg-none" id="closeSidebarBtn" title="بستن منو">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="sidebar-action p-3">
+            <button class="btn btn-new-chat w-100" id="newChatBtn">
+                <i class="bi bi-plus-lg me-2"></i> گفتگوی جدید
+            </button>
+        </div>
+
+        <div class="sidebar-search px-3 mb-2">
+            <div class="search-input-wrapper">
+                <i class="bi bi-search search-icon"></i>
+                <input type="text" id="searchChatsInput" class="form-control form-control-sm" placeholder="جستجو در گفتگوها..." />
+            </div>
+        </div>
+
+        <div class="sidebar-history-container" id="conversationsList">
+            <div class="history-loading text-center p-4 text-muted">
+                <div class="spinner-border spinner-border-sm mb-2" role="status"></div>
+                <div>در حال بارگذاری سوابق...</div>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="footer-db-status">
+                <i class="bi bi-database-check text-success me-2"></i>
+                <span class="small text-muted">ذخیره در SQL Server (SSMS)</span>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" id="refreshConversationsBtn" title="بروزرسانی تاریخچه">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Chat Window -->
+    <main class="chat-main">
+        <!-- Top Navigation Bar -->
+        <header class="chat-header">
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-icon d-lg-none" id="toggleSidebarBtn" title="نمایش سابقه گفتگوها">
+                    <i class="bi bi-list fs-5"></i>
+                </button>
+                <div class="active-conversation-meta">
+                    <h6 class="m-0 fw-bold" id="currentChatTitle">گفتگوی جدید</h6>
+                    <small class="text-muted d-none d-md-inline" id="currentChatSub">تحلیل هوشمند اسناد با Qwen و مدل‌های محلی</small>
+                </div>
+            </div>
+
+            <div class="chat-header-actions d-flex align-items-center gap-2">
+                <!-- Ollama Model Selector -->
+                <div class="model-selector-wrapper">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-body-tertiary">
+                            <i class="bi bi-cpu me-1 text-primary"></i> مدل:
+                        </span>
+                        <select class="form-select form-select-sm" id="modelSelect">
+                            <option value="qwen3.8" selected>qwen3.8 (پیش‌فرض)</option>
+                        </select>
+                        <button class="btn btn-outline-secondary" id="refreshModelsBtn" title="بازخوانی مدل‌های Ollama">
+                            <i class="bi bi-arrow-repeat" id="refreshModelsIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Custom Model Input Toggle for offline / custom model -->
+                <button class="btn btn-sm btn-outline-secondary" id="customModelBtn" title="وارد کردن دستی نام مدل" type="button">
+                    <i class="bi bi-pencil-square"></i>
+                </button>
+
+                <!-- Ollama Connection Status Badge -->
+                <span class="badge d-flex align-items-center gap-1 py-2 px-2" id="ollamaStatusBadge">
+                    <span class="status-dot"></span>
+                    <span id="ollamaStatusText">بررسی Ollama...</span>
+                </span>
+
+                <!-- Theme Toggle -->
+                <button class="btn btn-icon" id="themeToggleBtn" title="تغییر تم (تیره / روشن)">
+                    <i class="bi bi-sun-fill" id="themeIcon"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Custom Model Modal/Input row (Hidden by default) -->
+        <div class="custom-model-bar px-3 py-2 bg-body-tertiary border-bottom d-none" id="customModelRow">
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-muted text-nowrap">نام مدل دستی:</small>
+                <input type="text" id="manualModelInput" class="form-control form-control-sm" placeholder="مثال: qwen3.8 یا qwen2.5 یا llama3" value="qwen3.8" />
+                <button class="btn btn-sm btn-primary" id="applyManualModelBtn">اعمال</button>
+                <button class="btn btn-sm btn-link text-muted" id="closeManualModelBtn"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="form-text small text-info mt-1">
+                <i class="bi bi-info-circle me-1"></i> نکته: در صورت عدم وجود مدل روی سیستم، هیچ تلاش مجددی (Retry) انجام نخواهد شد و خطا سریعاً نمایش می‌یابد.
+            </div>
+        </div>
+
+        <!-- Chat Messages Container -->
+        <div class="chat-messages-container" id="chatMessages">
+            <!-- Welcome Screen (shown when conversation is empty) -->
+            <div class="welcome-container" id="welcomeScreen">
+                <div class="welcome-card text-center">
+                    <div class="welcome-icon">
+                        <i class="bi bi-chat-square-quote-fill"></i>
+                    </div>
+                    <h3 class="fw-bold mb-2">به چت‌باکس تحلیل اسناد خوش آمدید</h3>
+                    <p class="text-muted mb-4 max-w-600 mx-auto">
+                        فایل‌های Word (doc/docx)، PDF یا متنی خود را آپلود کنید و هرگونه پرسش، مقایسه، استخراج تفاوت‌ها یا تحلیل امضا را از مدل هوش مصنوعی بخواهید.
+                    </p>
+
+                    <!-- Example Prompt Cards -->
+                    <div class="row g-3 text-start justify-content-center">
+                        <div class="col-md-4">
+                            <div class="feature-prompt-card" data-prompt="این دو فایل را با یکدیگر مقایسه کن و تمام تفاوت‌های بین آن‌ها را به صورت جدول بنویس.">
+                                <div class="f-icon text-primary"><i class="bi bi-file-earmark-diff"></i></div>
+                                <h6 class="fw-bold mb-1">مقایسه دو سند Word</h6>
+                                <p class="small text-muted mb-0">«این دو فایل را با یکدیگر مقایسه کن و تمام تفاوت‌های بین آن‌ها را بنویس.»</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="feature-prompt-card" data-prompt="چه کسی این سند را امضا کرده است؟ تاریخ و سمت امضاکننده را مشخص کن.">
+                                <div class="f-icon text-success"><i class="bi bi-pen"></i></div>
+                                <h6 class="fw-bold mb-1">استخراج امضا و مسئول</h6>
+                                <p class="small text-muted mb-0">«چه کسی این سند را امضا کرده است؟ تاریخ و سمت امضاکننده چیست؟»</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="feature-prompt-card" data-prompt="خلاصه‌ای جامع و ساختاریافته از نکات کلیدی، شرایط و تعهدات این سند ارائه بده.">
+                                <div class="f-icon text-warning"><i class="bi bi-card-checklist"></i></div>
+                                <h6 class="fw-bold mb-1">خلاصه‌سازی و استخراج</h6>
+                                <p class="small text-muted mb-0">«خلاصه‌ای جامع از نکات کلیدی، شرایط و تعهدات این سند ارائه بده.»</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Dynamic Messages will be injected here -->
+        </div>
+
+        <!-- Input Area Container -->
+        <div class="chat-input-container">
+            <!-- Files Preview Bar (shows attached files chips) -->
+            <div class="attached-files-bar d-none" id="attachedFilesBar">
+                <div class="attached-files-list d-flex flex-wrap gap-2" id="attachedFilesList">
+                    <!-- File chips dynamically injected here -->
+                </div>
+            </div>
+
+            <!-- Input Form -->
+            <form id="chatForm" class="chat-input-form" onsubmit="return false;">
+                <!-- Hidden file input -->
+                <input type="file" id="fileUploadInput" multiple 
+                       accept=".pdf,.docx,.doc,.txt,.text,.md,.markdown,.json,.csv,.xml,.log,.yaml,.yml,.cs,.sql" 
+                       class="d-none" />
+
+                <div class="input-controls-wrapper">
+                    <!-- Attach File Button -->
+                    <button type="button" class="btn btn-attach" id="attachFileBtn" title="پیوست فایل (PDF, Word, Text)">
+                        <i class="bi bi-paperclip fs-5"></i>
+                    </button>
+
+                    <!-- Textarea -->
+                    <textarea id="promptInput" class="form-control chat-textarea" rows="1"
+                              placeholder="دستور خود را بنویسید (مثلاً: دو فایل آپلود شده چه تفاوتی با هم دارند؟ یا چه کسی این فایل را امضا کرده؟)..."
+                              autofocus></textarea>
+
+                    <!-- Send Button -->
+                    <button type="submit" class="btn btn-send" id="sendBtn" title="ارسال (Enter)">
+                        <i class="bi bi-arrow-up-circle-fill fs-4" id="sendIcon"></i>
+                    </button>
+                </div>
+            </form>
+
+            <div class="input-hint-row d-flex justify-content-between align-items-center mt-2 px-2">
+                <div class="small text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    پشتیبانی از فایل‌های: PDF، Word (.docx, .doc)، متن (.txt, .md, .json, .csv)
+                </div>
+                <div class="small text-muted d-none d-sm-block">
+                    <span><kbd>Enter</kbd> برای ارسال</span> | <span><kbd>Shift</kbd> + <kbd>Enter</kbd> خط جدید</span>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Extracted Text Modal (to inspect what text was extracted from files) -->
+<div class="modal fade" id="filePreviewModal" tabindex="-1" aria-labelledby="filePreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold" id="filePreviewModalLabel">
+                    <i class="bi bi-file-earmark-text me-2"></i> پیش‌نمایش متن استخراج شده
+                </h6>
+                <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2 small mb-3">
+                    <i class="bi bi-cpu me-1"></i> این متن به صورت خودکار توسط موتور استخراج خوانده شده و به عنوان کانتکست به مدل ارسال شده است.
+                </div>
+                <pre class="extracted-text-view bg-body-tertiary p-3 rounded" id="filePreviewContent"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="copyExtractedTextBtn">
+                    <i class="bi bi-clipboard me-1"></i> کپی متن
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-dismiss="modal">بستن</button>
+            </div>
+        </div>
+    </div>
+</div>
